@@ -1,0 +1,206 @@
+---
+title: "NYPD INCIDENT REPORT"
+author: "H A"
+output:
+Date: 5/20/2024
+
+---
+
+### -|-|-|-|-|-|-|-|-|-|-|Step 1|-|-|-|-|-|-|-|-|-|-|-
+
+### Introduction
+This project details every shooting incident in NYC from 2006 to 2021, reviewed by the NYPD's Office of Management Analysis and Planning. The data source is https://catalog.data.gov/dataset/nypd-shooting-incident-data-historic
+
+### Research Question
+Which Boro has the highest number of shooting incidents to allocate more resource?
+
+### Installing libraries
+
+```{r}
+library(tidyverse)
+library(readr)
+library(lubridate)
+```
+
+
+###import data from url https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD
+
+
+```{r}
+url <- "https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD"
+df <- read_csv(url)
+```
+
+
+
+### -|-|-|-|-|-|-|-|-|-|-|Step 2|-|-|-|-|-|-|-|-|-|-|-
+
+### Tidy and Transformation
+
+
+
+```{r}
+# read top 5 rows
+head(df,5)
+# read last 5 rows
+tail(df,5)
+```
+
+Add to your Rmd document a summary of the data and clean up your dataset by changing appropriate variables to factor and date types and getting rid of any columns not needed.  Show the summary of your data to be sure there is no missing data. If there is missing data, describe how you plan to handle it.
+
+### Data Exploration
+
+```{r}
+# list column names
+names(df)
+# number of columns in dataset
+ncol(df)
+```
+
+---
+There are 21 columns in dataset. First we check the datatype then we remove unwanted columns.
+```{r}
+# list datatype of each column
+str(df)
+```
+### Let's remove [X_COORD_CD,Y_COORD_CD, Latitude, Longitude, Lon_Lat] columns from the dataset.  
+```{r}
+# Remove specified columns
+df <- df[, -which(names(df) %in% c("X_COORD_CD", "Y_COORD_CD", "Latitude", "Longitude", "Lon_Lat"))]
+
+```
+
+### Total missing values
+```{r}
+total_missing_values <- sum(is.na(df))
+total_missing_values
+```
+### Removing columns with missing values
+
+
+```{r}
+df <- df[,colSums(is.na(df))==0]
+colnames(df)
+```
+
+
+---
+
+### Converting data types
+
+
+```{r}
+library(dplyr)
+df <- df %>%
+  mutate(INCIDENT_KEY = as.factor(INCIDENT_KEY),
+         OCCUR_DATE = as.Date(OCCUR_DATE, format = "%Y-%m-%d"),  # Specify format
+         OCCUR_TIME = as.POSIXct(OCCUR_TIME, format = ""),
+         BORO = as.factor(BORO),
+         PRECINCT = as.factor(PRECINCT),
+         STATISTICAL_MURDER_FLAG = as.logical(STATISTICAL_MURDER_FLAG),
+         VIC_AGE_GROUP = as.factor(VIC_AGE_GROUP),
+         VIC_SEX = as.factor(VIC_SEX),
+         VIC_RACE = as.factor(VIC_RACE))
+  
+```
+
+### Summary of data
+
+```{r}
+summary(df)
+```
+### -|-|-|-|-|-|-|-|-|-|-|- Step 3 -|-|-|-|-|-|-|-|-|-|-|-
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# Convert OCCUR_DATE to Date type
+df$OCCUR_DATE <- as.Date(df$OCCUR_DATE, format = "%Y-%m-%d")
+
+# Extract year from OCCUR_DATE
+df$YEAR <- lubridate::year(df$OCCUR_DATE)
+
+# Count shooting incidents per city
+city_shootings <- df %>%
+  group_by(BORO) %>%
+  summarise(shootings = n())
+
+# Count shooting incidents per year
+yearly_shootings <- df %>%
+  group_by(YEAR) %>%
+  summarise(shootings = n())
+
+```
+
+
+``` {r}
+# Visualization 1: Shooting incidents per city
+ggplot(city_shootings, aes(x = reorder(BORO, -shootings), y = shootings)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(title = "Shooting Incidents per City",
+       x = "City",
+       y = "Number of Shooting Incidents") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+
+
+```
+
+
+### Shooting Incidents by Age_Group
+
+```{r, }
+library(ggplot2)
+
+# shooting incidents per victim age group
+age_group_shootings <- df %>%
+  group_by(VIC_AGE_GROUP) %>%
+  summarise(shootings = n())
+
+# bar plot for shooting incidents by victim age group
+ggplot(age_group_shootings, aes(x = VIC_AGE_GROUP, y = shootings)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(title = "Shooting Incidents by Victim Age Group",
+       x = "Victim Age Group",
+       y = "Number of Shooting Incidents") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+### Shooting Incidents by Victim Gender
+```{r}
+age_group_shootings <- df %>%
+  group_by(VIC_SEX) %>%
+  summarise(shootings = n())
+
+ggplot(age_group_shootings, aes(x = 2, y = shootings, fill = VIC_SEX)) +
+  geom_bar(stat = "identity", width = 1, color = "black") +
+  coord_polar(theta = "y") +
+  xlim(0.5, 2.5) +
+  theme_void() +
+  geom_text(aes(label = shootings), position = position_stack(vjust = 0.5)) +
+  labs(title = "Shooting Incidents by Victim Gender", fill = "Victim Gender") +
+  theme(legend.position = "bottom") +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+### -|-|-|-|-|-|-|-|-|-|-|Step 4|-|-|-|-|-|-|-|-|-|-|-
+
+
+### Conclusion
+We need to allocate more resources and put more police officers in Brooklyn. Perhaps move some officers from Staten Island to Brooklyn since they the fewest incidents.
+Work we the local social services to work with the youth to prevent crimes from happening in the first place.
+
+
+### Bias
+ 1 - There is a potential bias since we don't know how data was collected.
+ 2 - lack of demographic information make any decision incomplete.
+ 3 - Too many missing values
+
+
